@@ -1,37 +1,30 @@
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/auth';
 
-const DEFAULT_USER_EMAIL = 'test@example.com';
-const DEFAULT_USER_PASSWORD = 'password123';
-
-async function getDefaultUserId() {
-  let user = await prisma.user.findUnique({
-    where: { email: DEFAULT_USER_EMAIL },
-  });
-
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
   if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: DEFAULT_USER_EMAIL,
-        password: DEFAULT_USER_PASSWORD,
-      },
-    });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return user.id;
-}
+  const body = await request.json();
+  const customer = body.customer?.toString().trim();
+  const amount = Number(body.amount);
+  const status = body.status?.toString() || 'pending';
 
-export async function POST(req: Request) {
-  const { customer, amount } = await req.json();
-  const userId = await getDefaultUserId();
+  if (!customer || !amount) {
+    return NextResponse.json({ error: 'Asiakkaan nimi ja summa ovat pakollisia.' }, { status: 400 });
+  }
 
   await prisma.invoice.create({
     data: {
       customer,
       amount,
-      status: 'pending',
-      userId,
+      status,
+      userId: user.id,
     },
   });
 
-  return Response.json({ ok: true });
+  return NextResponse.json({ ok: true });
 }
